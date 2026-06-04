@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MazePaws</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body, html { 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            touch-action: none;
+        }
+        #canvas-container { 
+            width: 100%; 
+            height: 100%; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            z-index: 1; 
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans select-none">
+
+    <div id="canvas-container"></div>
+
+<div id="hud" class="hidden absolute top-0 left-0 w-full p-3 sm:p-5 z-[5] pointer-events-none flex justify-between items-start">
+    
+    <div class="bg-white/95 backdrop-blur-md p-3 rounded-xl pointer-events-auto border border-white/80 shadow-lg flex flex-col gap-1.5 min-w-[140px] text-xs sm:text-sm">
+        <div class="font-semibold text-slate-500">
+            <i class="fa-solid fa-dog mr-1"></i> Pet: <span id="hud-pet-name" class="text-slate-800 font-extrabold">-</span>
+        </div>
+        <div class="font-semibold text-slate-500">
+            <i class="fa-solid fa-gem text-sky-500 mr-1"></i> Gems: <span id="hud-gems" class="text-slate-800 font-extrabold">0</span>
+        </div>
+        <div class="font-semibold text-slate-500">
+            <i class="fa-solid fa-star text-yellow-500 mr-1"></i> Score: <span id="hud-score" class="text-slate-800 font-extrabold">0</span>
+        </div>
+    </div>
+
+    <div class="flex flex-col items-end gap-2 pointer-events-auto">
+        <div class="bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/80 shadow-lg text-sm font-extrabold text-slate-800">
+            <span id="hud-timer">00:00</span>
+        </div>
+        <div class="bg-white/95 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/80 shadow-lg text-sm font-extrabold text-slate-800">
+            <i class="fa-solid fa-coins text-amber-500 mr-1"></i> <span id="hud-money">0.00</span>
+        </div>
+        <button class="px-4 py-1.5 text-xs font-bold bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 active:scale-95 transition-all rounded-full shadow-md flex items-center gap-1" onclick="game.giveUp()">
+            <i class="fa-solid fa-flag text-red-500"></i> <span class="hidden sm:inline">Menyerah</span>
+        </button>
+    </div>
+</div>
+
+    <div id="joystick-zone" class="absolute bottom-10 left-10 w-32 h-32 bg-white/40 backdrop-blur-[2px] rounded-full border border-slate-900/15 z-[5] hidden touch-none shadow-md">
+        <div id="joystick-stick" class="absolute top-9 left-9 w-14 h-14 bg-gradient-to-br from-slate-600 to-slate-800 rounded-full shadow-lg"></div>
+    </div>
+
+    <div id="minimap-container" class="absolute bottom-5 right-5 w-32 h-32 rounded-2xl border-2 border-slate-200 bg-white/90 backdrop-blur-[2px] z-[5] hidden overflow-hidden shadow-lg">
+        <canvas id="minimap-canvas" class="w-full h-full"></canvas>
+    </div>
+
+    <div id="menu-screen" class="absolute top-0 left-0 w-full h-full z-10 flex flex-col justify-center items-center bg-slate-50/90 backdrop-blur-md transition-all duration-300">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 text-center mb-2 tracking-tight">
+			MazePaws
+		</h1>
+        <div class="text-sm md:text-base text-slate-500 mb-8 text-center max-w-sm px-4">Jelajahi labirin, Temukan Kebebasan & kumpulkan permata berharga bersama peliharaanmu!</div>
+        <div class="flex flex-col gap-3 w-full max-w-xs px-4">
+            <button class="w-full py-3.5 text-base font-bold bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full hover:shadow-lg hover:shadow-orange-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md" onclick="game.startRun()">
+                <i class="fa-solid fa-play"></i> Mulai
+            </button>
+            <button class="w-full py-3 text-base font-bold bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 active:scale-[0.98] transition-all rounded-full flex items-center justify-center gap-2 shadow-sm" onclick="game.openShop()">
+                <i class="fa-solid fa-store text-orange-500"></i> Toko Peliharaan
+            </button>
+            <button class="w-full py-3 text-base font-bold bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 active:scale-[0.98] transition-all rounded-full flex items-center justify-center gap-2 shadow-sm" onclick="game.resetProgress()">
+                <i class="fa-solid fa-rotate-left text-slate-500"></i> Atur Ulang Kemajuan
+            </button>
+        </div>
+    </div>
+
+    <div id="shop-screen" class="absolute top-0 left-0 w-full h-full z-10 flex flex-col justify-center items-center bg-slate-50/90 backdrop-blur-md transition-all duration-300 hidden">
+        <div class="w-[95%] max-w-4xl bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl flex flex-col max-h-[85%]">
+            <div class="flex justify-between items-center mb-5 pb-4 border-b border-slate-100">
+                <h2 class="text-2xl font-extrabold text-slate-950">Toko Peliharaan</h2>
+                <div class="font-extrabold text-slate-600 text-lg">
+                    Uang: <span class="text-emerald-600"><span id="shop-money-display">0.00</span></span>
+                </div>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-6 flex-grow min-h-0 overflow-hidden">
+                <div class="flex-1 overflow-y-auto pr-2 grid grid-cols-1 sm:grid-cols-2 gap-3 content-start" id="shop-items-list">
+                </div>
+                
+                <div class="w-full md:w-[360px] bg-slate-50 border border-slate-200 rounded-2xl flex flex-col overflow-hidden relative shadow-inner">
+                    <div id="shop-canvas-container" class="w-full h-[180px] bg-gradient-to-b from-white to-slate-100 relative">
+                        <canvas id="shop-preview-canvas" class="w-full h-full"></canvas>
+                        <div id="preview-loader" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 hidden">
+                            <i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat Peliharaan...
+                        </div>
+                    </div>
+                    <div class="p-4 flex-grow flex flex-col justify-between border-t border-slate-200">
+                        <div>
+                            <div class="text-lg font-extrabold text-slate-950" id="prev-name">Bunny</div>
+                            <div class="text-xs font-bold uppercase tracking-wider mb-3" id="prev-rarity">Umum</div>
+                            <div class="bg-white rounded-xl p-3 border border-slate-200 flex flex-col gap-1 text-sm text-slate-500 font-semibold mb-3">
+                                <div class="flex justify-between">Kecepatan: <span id="prev-speed" class="text-slate-900 font-bold">4</span></div>
+                                <div class="flex justify-between">Kelangkaan: <span id="prev-tier" class="text-slate-900 font-bold">T1</span></div>
+                            </div>
+                        </div>
+                        <div id="shop-action-container">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-right mt-5 pt-4 border-t border-slate-100">
+                <button class="px-6 py-2.5 font-bold bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 active:scale-95 rounded-full shadow-sm transition-all" onclick="game.closeShop()">Kembali</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-modal" class="absolute top-0 left-0 w-full h-full z-[1000] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+        <div class="bg-white p-6 rounded-3xl max-w-sm w-[90%] shadow-2xl border border-slate-200 text-center scale-90 transition-all duration-300" id="modal-box">
+            <h3 id="game-modal-title" class="text-xl font-extrabold text-slate-950 mb-2">Info</h3>
+            <p id="game-modal-text" class="text-sm text-slate-500 font-semibold leading-relaxed mb-6">Deskripsi pesan...</p>
+            <div class="flex gap-3 justify-center" id="game-modal-buttons">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GAME_SETTINGS = {
+            // Pengaturan Minimap
+            enableMinimap: true,        // TRUE: minimap aktif, FALSE: minimap dinonaktifkan sepenuhnya dari game
+            minimapUnlockTime: 10,      // Waktu tunggu (detik) sebelum minimap terbuka (set ke 0 agar minimap langsung aktif sejak awal)
+
+            // Pengaturan Skala & Ukuran Labirin
+            baseMazeWidth: 11,          // Lebar awal labirin saat level 1 (Harus berupa angka GANJIL)
+            baseMazeHeight: 11,         // Tinggi awal labirin saat level 1 (Harus berupa angka GANJIL)
+            sizeMultiplier: 2,          // Tambahan ukuran labirin setiap kali Anda naik level/kesulitan
+            maxMazeWidth: 29,           // Batas maksimal lebar labirin agar performa rendering di HP tetap lancar
+            maxMazeHeight: 29,          // Batas maksimal tinggi labirin
+
+            // Pengaturan Kamera Dinamis (Dikunci sesuai permintaan)
+            cameraHeight: 4.0,
+            cameraDistance: 4.0,
+            cameraFOV: 95,
+			
+			// Bonus kemenangan
+			victoryBonus: 10000
+        };
+
+        // Database
+		const PET_DATABASE = [
+			{ id: 'bunny', name: 'Bunny', file: 'animal-bunny.glb', price: 0, speed: 4, rarity: 'Umum', color: 'text-emerald-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-bunny.png"/>` },
+			{ id: 'bee', name: 'Bee', file: 'animal-bee.glb', price: 50, speed: 5, rarity: 'Umum', color: 'text-emerald-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-bee.png"/>` },
+			{ id: 'cat', name: 'Cat', file: 'animal-cat.glb', price: 100, speed: 5, rarity: 'Umum', color: 'text-emerald-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-cat.png"/>` },
+			{ id: 'chick', name: 'Chick', file: 'animal-chick.glb', price: 100, speed: 4, rarity: 'Umum', color: 'text-emerald-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-chick.png"/>` },
+			{ id: 'caterpillar', name: 'Caterpillar', file: 'animal-caterpillar.glb', price: 120, speed: 3, rarity: 'Umum', color: 'text-emerald-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-caterpillar.png"/>` },
+			{ id: 'crab', name: 'Crab', file: 'animal-crab.glb', price: 150, speed: 4, rarity: 'Umum', color: 'text-emerald-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-crab.png"/>` },
+			{ id: 'dog', name: 'Dog', file: 'animal-dog.glb', price: 200, speed: 6, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-dog.png"/>` },
+			{ id: 'fox', name: 'Fox', file: 'animal-fox.glb', price: 250, speed: 6, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-fox.png"/>` },
+			{ id: 'beaver', name: 'Beaver', file: 'animal-beaver.glb', price: 250, speed: 5, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-beaver.png"/>` },
+			{ id: 'cow', name: 'Cow', file: 'animal-cow.glb', price: 300, speed: 4, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-cow.png"/>` },
+			{ id: 'deer', name: 'Deer', file: 'animal-deer.glb', price: 350, speed: 7, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-deer.png"/>` },
+			{ id: 'pig', name: 'Pig', file: 'animal-pig.glb', price: 350, speed: 4, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-pig.png"/>` },
+			{ id: 'hog', name: 'Hog', file: 'animal-hog.glb', price: 400, speed: 5, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-hog.png"/>` },
+			{ id: 'fish', name: 'Fish', file: 'animal-fish.glb', price: 400, speed: 7, rarity: 'Langka', color: 'text-blue-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-fish.png"/>` },
+			{ id: 'koala', name: 'Koala', file: 'animal-koala.glb', price: 450, speed: 4, rarity: 'Epik', color: 'text-purple-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-koala.png"/>` },
+			{ id: 'monkey', name: 'Monkey', file: 'animal-monkey.glb', price: 450, speed: 7, rarity: 'Epik', color: 'text-purple-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-monkey.png"/>` },
+			{ id: 'penguin', name: 'Penguin', file: 'animal-penguin.glb', price: 500, speed: 6, rarity: 'Epik', color: 'text-purple-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-penguin.png"/>` },
+			{ id: 'tiger', name: 'Tiger', file: 'animal-tiger.glb', price: 500, speed: 7, rarity: 'Epik', color: 'text-purple-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-tiger.png"/>` },
+			{ id: 'parrot', name: 'Parrot', file: 'animal-parrot.glb', price: 600, speed: 8, rarity: 'Epik', color: 'text-purple-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-parrot.png"/>` },
+			{ id: 'panda', name: 'Panda', file: 'animal-panda.glb', price: 750, speed: 5, rarity: 'Legendaris', color: 'text-amber-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-panda.png"/>` },
+			{ id: 'polar', name: 'Polar Bear', file: 'animal-polar.glb', price: 800, speed: 6, rarity: 'Legendaris', color: 'text-amber-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-polar.png"/>` },
+			{ id: 'giraffe', name: 'Giraffe', file: 'animal-giraffe.glb', price: 900, speed: 7, rarity: 'Legendaris', color: 'text-amber-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-giraffe.png"/>` },
+			{ id: 'elephant', name: 'Elephant', file: 'animal-elephant.glb', price: 950, speed: 4, rarity: 'Legendaris', color: 'text-amber-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-elephant.png"/>` },
+			{ id: 'lion', name: 'Lion', file: 'animal-lion.glb', price: 1000, speed: 8, rarity: 'Legendaris', color: 'text-amber-500', svg: `<img class="h-12 w-12" src="./assets/peth/Previews/animal-lion.png"/>` }
+		];
+
+        // Jenis Gems
+        const GEM_TYPES = [
+            { type: 'green', value: 1, color: 0x10b981, chance: 0.7 },
+            { type: 'blue', value: 2, color: 0x3b82f6, chance: 0.2 },
+            { type: 'gold', value: 5, color: 0xf59e0b, chance: 0.1 }
+        ];
+
+        // ==========================================
+        // UI DIALOG MODAL SYSTEM (MANDATORY SAFE ALERT)
+        // ==========================================
+        class ModalSystem {
+            static show(title, text, confirmCallback = null, isConfirm = false) {
+                const modal = document.getElementById('game-modal');
+                const box = document.getElementById('modal-box');
+                const titleEl = document.getElementById('game-modal-title');
+                const textEl = document.getElementById('game-modal-text');
+                const btnContainer = document.getElementById('game-modal-buttons');
+
+                titleEl.innerText = title;
+                textEl.innerText = text;
+                btnContainer.innerHTML = '';
+
+                if (isConfirm) {
+                    const yesBtn = document.createElement('button');
+                    yesBtn.className = 'px-6 py-2.5 text-sm font-bold bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full hover:shadow-lg active:scale-95 transition-all shadow-md';
+                    yesBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Ya';
+                    yesBtn.onclick = () => {
+                        this.hide();
+                        if (confirmCallback) confirmCallback(true);
+                    };
+
+                    const noBtn = document.createElement('button');
+                    noBtn.className = 'px-6 py-2.5 text-sm font-bold bg-white text-slate-800 border border-slate-200 hover:bg-slate-50 active:scale-95 rounded-full shadow-sm transition-all';
+                    noBtn.innerHTML = '<i class="fa-solid fa-xmark mr-1"></i> Batal';
+                    noBtn.onclick = () => {
+                        this.hide();
+                        if (confirmCallback) confirmCallback(false);
+                    };
+
+                    btnContainer.appendChild(yesBtn);
+                    btnContainer.appendChild(noBtn);
+                } else {
+                    const okBtn = document.createElement('button');
+                    okBtn.className = 'px-6 py-2.5 text-sm font-bold bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full hover:shadow-lg active:scale-95 transition-all shadow-md';
+                    okBtn.innerHTML = 'Mengerti';
+                    okBtn.onclick = () => {
+                        this.hide();
+                        if (confirmCallback) confirmCallback(true);
+                    };
+                    btnContainer.appendChild(okBtn);
+                }
+
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                box.classList.remove('scale-90');
+                box.classList.add('scale-100');
+            }
+
+            static hide() {
+                const modal = document.getElementById('game-modal');
+                const box = document.getElementById('modal-box');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                box.classList.remove('scale-100');
+                box.classList.add('scale-90');
+            }
+        }
+
+        // ==========================================
+        // SAVE PROGRESS SYSTEM
+        // ==========================================
+        class SaveSystem {
+            constructor() {
+                this.defaults = { money: 0.0, unlockedPets: ['bunny'], selectedPet: 'bunny', highScore: 0, totalGems: 0, levelDifficulty: 1 };
+                this.data = { ...this.defaults };
+                this.load();
+            }
+            load() {
+                const stored = localStorage.getItem('pet_dungeon_save_v2');
+                if (stored) {
+                    try { this.data = JSON.parse(stored); } catch(e) { this.data = { ...this.defaults }; }
+                }
+            }
+            save() { localStorage.setItem('pet_dungeon_save_v2', JSON.stringify(this.data)); }
+            reset() { this.data = JSON.parse(JSON.stringify(this.defaults)); this.save(); }
+        }
+
+        // ==========================================
+        // SYNTHESIZED WEB AUDIO MANAGER
+        // ==========================================
+        class AudioManager {
+            constructor() { this.ctx = null; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+            playClick() { this.beep(440, 0.05, 'square'); }
+            playCollect() { this.beep(880, 0.08, 'sine'); setTimeout(() => this.beep(1320, 0.1, 'sine'), 40); }
+            playWin() { this.beep(523.25, 0.1, 'triangle'); setTimeout(() => this.beep(659.25, 0.1, 'triangle'), 100); setTimeout(() => this.beep(783.99, 0.3, 'triangle'), 200); }
+            playBuy() { this.beep(587.33, 0.1, 'sine'); setTimeout(() => this.beep(1174.66, 0.2, 'sine'), 80); }
+            playError() { this.beep(150, 0.2, 'sawtooth'); }
+            beep(freq, duration, type = 'sine') {
+                if (!this.ctx) return;
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+        }
+
+        // ==========================================
+        // MAZE GENERATOR
+        // ==========================================
+        class MazeGenerator {
+            static generate(width, height) {
+                let grid = Array(height).fill(null).map(() => Array(width).fill(1));
+                let stack = [];
+                
+                grid[1][1] = 0;
+                stack.push([1, 1]);
+
+                while(stack.length > 0) {
+                    let [cx, cy] = stack[stack.length - 1];
+                    let neighbors = [];
+                    let dirs = [[0,-2],[0,2],[-2,0],[2,0]];
+
+                    for(let [dx, dy] of dirs) {
+                        let nx = cx + dx, ny = cy + dy;
+                        if(nx > 0 && nx < width - 1 && ny > 0 && ny < height - 1 && grid[ny][nx] === 1) {
+                            neighbors.push([nx, ny, dx, dy]);
+                        }
+                    }
+
+                    if(neighbors.length > 0) {
+                        let [nx, ny, dx, dy] = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        grid[cy + dy/2][cx + dx/2] = 0;
+                        grid[ny][nx] = 0;
+                        stack.push([nx, ny]);
+                    } else {
+                        stack.pop();
+                    }
+                }
+
+                // Buat jalan alternatif agar tidak terlalu linier
+                for(let y=2; y<height-2; y += 2) {
+                    for(let x=2; x<width-2; x += 2) {
+                        if(grid[y][x] === 1 && Math.random() < 0.25) {
+                            grid[y][x] = 0;
+                        }
+                    }
+                }
+
+                grid[1][1] = 0;
+                grid[height-2][width-2] = 0;
+                grid[height-2][width-3] = 0; 
+                
+                return grid;
+            }
+        }
+
+        // ==========================================
+        // HYBRID CONTROL CONTROLLER
+        // ==========================================
+        class InputController {
+            constructor() {
+                this.keys = { up: false, down: false, left: false, right: false };
+                this.vector = new THREE.Vector2(0, 0);
+                this.isMobile = false;
+
+                window.addEventListener('keydown', (e) => this.updateKeys(e.code, true));
+                window.addEventListener('keyup', (e) => this.updateKeys(e.code, false));
+                this.initJoystick();
+            }
+
+            updateKeys(code, isPressed) {
+                if(code === 'KeyW' || code === 'ArrowUp') this.keys.up = isPressed;
+                if(code === 'KeyS' || code === 'ArrowDown') this.keys.down = isPressed;
+                if(code === 'KeyA' || code === 'ArrowLeft') this.keys.left = isPressed;
+                if(code === 'KeyD' || code === 'ArrowRight') this.keys.right = isPressed;
+                this.calculateVector();
+            }
+
+            calculateVector() {
+                let vx = 0, vy = 0;
+                if(this.keys.up) vy = -1; // Maju
+                if(this.keys.down) vy = 1; // Mundur
+                if(this.keys.left) vx = -1; // Belok Kiri
+                if(this.keys.right) vx = 1; // Belok Kanan
+                this.vector.set(vx, vy); 
+            }
+
+            initJoystick() {
+                const zone = document.getElementById('joystick-zone');
+                const stick = document.getElementById('joystick-stick');
+                if(!zone || !stick) return;
+
+                if('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                    this.isMobile = true;
+                    zone.classList.remove('hidden');
+                    zone.classList.add('block');
+                }
+
+                let active = false;
+                let startX = 0, startY = 0;
+
+                const onStart = (e) => {
+                    active = true;
+                    let touch = e.touches ? e.touches[0] : e;
+                    startX = touch.clientX;
+                    startY = touch.clientY;
+                };
+
+                const onMove = (e) => {
+                    if(!active) return;
+                    let touch = e.touches ? e.touches[0] : e;
+                    let dx = touch.clientX - startX;
+                    let dy = touch.clientY - startY;
+                    let dist = Math.min(Math.sqrt(dx*dx + dy*dy), 45);
+                    let angle = Math.atan2(dy, dx);
+
+                    let mx = Math.cos(angle) * dist;
+                    let my = Math.sin(angle) * dist;
+
+                    stick.style.transform = `translate(${mx}px, ${my}px)`;
+                    
+                    let vx = Math.cos(angle) * (dist / 45);
+                    let vy = Math.sin(angle) * (dist / 45);
+                    this.vector.set(vx, vy);
+                };
+
+                const onEnd = () => {
+                    if(!active) return;
+                    active = false;
+                    stick.style.transform = `translate(0px, 0px)`;
+                    this.vector.set(0, 0);
+                };
+
+                zone.addEventListener('touchstart', onStart);
+                window.addEventListener('touchmove', onMove);
+                window.addEventListener('touchend', onEnd);
+            }
+        }
+
+        // ==========================================
+        // MAIN GAME ENGINE
+        // ==========================================
+        class PetDungeonGame {
+            constructor() {
+                this.saveSystem = new SaveSystem();
+                this.audio = new AudioManager();
+                this.input = new InputController();
+                
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                
+                this.isPlaying = false;
+                this.mazeData = [];
+                this.mazeWidth = 15;
+                this.mazeHeight = 15;
+                this.blockSize = 3.5;
+                
+                this.playerMesh = null;
+                this.gemsGroup = [];
+                this.particles = [];
+                this.dungeonDust = [];
+                this.exitMesh = null;
+                this.exitLight = null;
+                this.exitRings = [];
+                
+                this.currentGemsCollected = 0;
+                this.elapsedTime = 0;
+                this.timerInterval = null;
+                this.miniMapUnlocked = false;
+
+                this.gltfLoader = new THREE.GLTFLoader();
+                this.textureLoader = new THREE.TextureLoader();
+                this.petTexture = null;
+
+                this.initEngine();
+                this.initShopPreviewEngine();
+                this.animate();
+            }
+
+            initEngine() {
+                const container = document.getElementById('canvas-container');
+                this.scene = new THREE.Scene();
+                
+                // Tema Terang (Light Theme Sky & Fog)
+                this.scene.background = new THREE.Color(0xf1f5f9);
+                this.scene.fog = new THREE.FogExp2(0xf1f5f9, 0.04);
+
+                this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+                
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.0;
+                container.appendChild(this.renderer.domElement);
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
+                this.scene.add(ambientLight);
+
+                this.dirLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+                this.dirLight.castShadow = true;
+                this.dirLight.shadow.mapSize.width = 2048;
+                this.dirLight.shadow.mapSize.height = 2048;
+                this.dirLight.shadow.bias = -0.0001;
+                this.scene.add(this.dirLight);
+
+                this.petTexture = this.textureLoader.load('assets/peth/Models/GLB/Textures/colormap.png');
+                this.petTexture.flipY = false;
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            initShopPreviewEngine() {
+                const canvas = document.getElementById('shop-preview-canvas');
+                this.shopRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+                this.shopRenderer.setSize(380, 180);
+                this.shopRenderer.shadowMap.enabled = true;
+
+                this.shopScene = new THREE.Scene();
+                this.shopCamera = new THREE.PerspectiveCamera(40, 380 / 180, 0.1, 100);
+                this.shopCamera.position.set(0, 2.5, 4.5);
+                this.shopCamera.lookAt(0, 0.6, 0);
+
+                const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+                this.shopScene.add(ambient);
+
+                const dir = new THREE.DirectionalLight(0xfffbeb, 1.2);
+                dir.position.set(5, 10, 5);
+                this.shopScene.add(dir);
+
+                this.previewGroup = new THREE.Group();
+                this.shopScene.add(this.previewGroup);
+                this.selectedPreviewPetId = 'bunny';
+            }
+
+            startRun() {
+                this.audio.init();
+                this.audio.playClick();
+                
+                const difficulty = this.saveSystem.data.levelDifficulty || 1;
+                
+                // Kalkulasi ukuran labirin menggunakan batasan dari GAME_SETTINGS
+                let calculatedWidth = GAME_SETTINGS.baseMazeWidth + ((difficulty - 1) * GAME_SETTINGS.sizeMultiplier);
+                let calculatedHeight = GAME_SETTINGS.baseMazeHeight + ((difficulty - 1) * GAME_SETTINGS.sizeMultiplier);
+                
+                // Batasi ukuran agar tidak melebihi batas maksimum yang dikonfigurasi
+                this.mazeWidth = Math.min(calculatedWidth, GAME_SETTINGS.maxMazeWidth);
+                this.mazeHeight = Math.min(calculatedHeight, GAME_SETTINGS.maxMazeHeight);
+
+                // Validasi agar dimensi labirin selalu bernilai ganjil demi kestabilan Maze Generator DFS
+                if (this.mazeWidth % 2 === 0) this.mazeWidth += 1;
+                if (this.mazeHeight % 2 === 0) this.mazeHeight += 1;
+
+                this.currentGemsCollected = 0;
+                this.elapsedTime = 0;
+                this.miniMapUnlocked = false;
+                document.getElementById('minimap-container').style.display = 'none';
+
+                this.clearScene();
+                this.mazeData = MazeGenerator.generate(this.mazeWidth, this.mazeHeight);
+                this.build3DGrid();
+                this.spawnDungeonDust();
+
+                const activePetId = this.saveSystem.data.selectedPet;
+                this.loadActivePlayerPet(activePetId);
+
+                document.getElementById('menu-screen').classList.add('hidden');
+                document.getElementById('hud').classList.remove('hidden');
+                this.updateHUD();
+
+                // Tampilkan minimap langsung di detik ke-0 jika diizinkan secara instan
+                if (GAME_SETTINGS.enableMinimap && GAME_SETTINGS.minimapUnlockTime === 0) {
+                    this.miniMapUnlocked = true;
+                    document.getElementById('minimap-container').style.display = 'block';
+                }
+
+                clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    this.elapsedTime++;
+                    this.updateHUD();
+                    
+                    // Aktifkan minimap seiring berjalannya waktu jika fiturnya diaktifkan
+                    if(GAME_SETTINGS.enableMinimap && !this.miniMapUnlocked && this.elapsedTime >= GAME_SETTINGS.minimapUnlockTime) {
+                        this.miniMapUnlocked = true;
+                        document.getElementById('minimap-container').style.display = 'block';
+                    }
+                }, 1000);
+
+                this.isPlaying = true;
+            }
+
+            build3DGrid() {
+                // Tembok Utama Labirin (Aksen Terang Putih Mutiara)
+                const wallGeo = new THREE.BoxGeometry(this.blockSize, 3, this.blockSize);
+                const wallMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 });
+                
+                // Aksen Trim Bagian Atas Tembok agar Outline Terlihat Jelas & Cantik
+                const trimGeo = new THREE.BoxGeometry(this.blockSize * 1.02, 0.15, this.blockSize * 1.02);
+                const trimMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.5 });
+
+                const floorGeo = new THREE.PlaneGeometry(this.mazeWidth * this.blockSize, this.mazeHeight * this.blockSize);
+                const floorMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 });
+                const floor = new THREE.Mesh(floorGeo, floorMat);
+                floor.rotation.x = -Math.PI / 2;
+                floor.position.set((this.mazeWidth * this.blockSize)/2 - this.blockSize/2, 0, (this.mazeHeight * this.blockSize)/2 - this.blockSize/2);
+                floor.receiveShadow = true;
+                this.scene.add(floor);
+
+                this.wallMeshes = [];
+
+                for(let y=0; y<this.mazeHeight; y++) {
+                    for(let x=0; x<this.mazeWidth; x++) {
+                        let cell = this.mazeData[y][x];
+                        let px = x * this.blockSize;
+                        let pz = y * this.blockSize;
+
+                        if(cell === 1) {
+                            // Gabungkan tembok utama dan trim atasnya
+                            const wallGroup = new THREE.Group();
+                            wallGroup.position.set(px, 1.5, pz);
+
+                            let wMesh = new THREE.Mesh(wallGeo, wallMat);
+                            wMesh.castShadow = true;
+                            wMesh.receiveShadow = true;
+                            wallGroup.add(wMesh);
+
+                            let tMesh = new THREE.Mesh(trimGeo, trimMat);
+                            tMesh.position.y = 1.5;
+                            tMesh.castShadow = true;
+                            wallGroup.add(tMesh);
+
+                            this.scene.add(wallGroup);
+                            this.wallMeshes.push(wallGroup);
+
+                            // Pasang Obor Dinding Estetik (Torch) secara acak di persimpangan
+                            if(Math.random() < 0.12 && x > 0 && x < this.mazeWidth - 1 && y > 0 && y < this.mazeHeight - 1) {
+                                this.spawnWallTorch(px, pz);
+                            }
+                        } else {
+                            if((x !== 1 || y !== 1) && (x !== this.mazeWidth-2 || y !== this.mazeHeight-2)) {
+                                if(Math.random() < 0.2) {
+                                    this.spawnGem(px, pz);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Portal Finish Mewah dengan Efek Aura Cincin
+                const fx = (this.mazeWidth - 2) * this.blockSize;
+                const fz = (this.mazeHeight - 2) * this.blockSize;
+                
+                const exitGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.2, 32);
+                const exitMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.3, roughness: 0.1 });
+                this.exitMesh = new THREE.Mesh(exitGeo, exitMat);
+                this.exitMesh.position.set(fx, 0.1, fz);
+                this.scene.add(this.exitMesh);
+
+                this.exitLight = new THREE.PointLight(0xf59e0b, 2.5, 8);
+                this.exitLight.position.set(fx, 2, fz);
+                this.scene.add(this.exitLight);
+
+                // Tambahkan Cincin Energi Portal Berputar
+                this.exitRings = [];
+                for(let i=0; i<2; i++) {
+                    const ringGeo = new THREE.TorusGeometry(0.8 - i*0.25, 0.08, 8, 24);
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.8 });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.position.set(fx, 0.4, fz);
+                    ring.rotation.x = Math.PI / 2;
+                    this.scene.add(ring);
+                    this.exitRings.push(ring);
+                }
+            }
+
+            // Melahirkan Obor Dinding bercahaya hangat
+            spawnWallTorch(x, z) {
+                const torchGroup = new THREE.Group();
+                torchGroup.position.set(x, 1.3, z);
+
+                // Tiang Obor Hitam
+                const poleGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.6, 8);
+                const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
+                const pole = new THREE.Mesh(poleGeo, poleMat);
+                pole.rotation.x = Math.PI / 6; // Miring menjorok keluar
+                torchGroup.add(pole);
+
+                // Kepala Obor / Api Bersinar
+                const flameGeo = new THREE.SphereGeometry(0.18, 12, 12);
+                const flameMat = new THREE.MeshBasicMaterial({ color: 0xf97316 });
+                const flame = new THREE.Mesh(flameGeo, flameMat);
+                flame.position.set(0, 0.35, 0.18);
+                torchGroup.add(flame);
+
+                // Cahaya Terang Obor Dinamis
+                const torchLight = new THREE.PointLight(0xf97316, 1.2, 6);
+                torchLight.position.set(0, 0.5, 0.2);
+                torchGroup.add(torchLight);
+
+                this.scene.add(torchGroup);
+                this.wallMeshes.push(torchGroup); // Masukkan ke pembersihan scene
+            }
+
+            // Melahirkan partikel debu dungeon magis yang melayang perlahan
+            spawnDungeonDust() {
+                const particleCount = Math.min(this.mazeWidth * this.mazeHeight, 80);
+                for(let i=0; i<particleCount; i++) {
+                    const pGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+                    const pMat = new THREE.MeshBasicMaterial({ 
+                        color: 0xfde047, 
+                        transparent: true, 
+                        opacity: Math.random() * 0.4 + 0.1 
+                    });
+                    const p = new THREE.Mesh(pGeo, pMat);
+                    
+                    p.position.set(
+                        Math.random() * this.mazeWidth * this.blockSize,
+                        Math.random() * 3.5,
+                        Math.random() * this.mazeHeight * this.blockSize
+                    );
+                    
+                    p.userData = {
+                        speedY: Math.random() * 0.2 + 0.1,
+                        rotSpeed: Math.random() * 0.02
+                    };
+
+                    this.scene.add(p);
+                    this.dungeonDust.push(p);
+                }
+            }
+
+            spawnGem(x, z) {
+                let rand = Math.random();
+                let config = GEM_TYPES[0];
+                let cum = 0;
+                for(let g of GEM_TYPES) {
+                    cum += g.chance;
+                    if(rand <= cum) { config = g; break; }
+                }
+
+                const gemGeo = new THREE.OctahedronGeometry(0.35, 0);
+                const gemMat = new THREE.MeshStandardMaterial({ 
+                    color: config.color, 
+                    emissive: config.color, 
+                    emissiveIntensity: 0.8, 
+                    roughness: 0.1 
+                });
+                const mesh = new THREE.Mesh(gemGeo, gemMat);
+                mesh.position.set(x, 0.8, z);
+                mesh.userData = { 
+                    type: config.type, 
+                    value: config.value,
+                    baseY: 0.8,
+                    pulseOffset: Math.random() * Math.PI * 2
+                };
+                
+                this.scene.add(mesh);
+                this.gemsGroup.push(mesh);
+            }
+
+            loadActivePlayerPet(petId) {
+                const petConfig = PET_DATABASE.find(p => p.id === petId) || PET_DATABASE[0];
+                
+                if(this.playerMesh) {
+                    this.scene.remove(this.playerMesh);
+                }
+
+                this.playerMesh = new THREE.Group();
+                this.playerMesh.position.set(1 * this.blockSize, 0, 1 * this.blockSize);
+                this.scene.add(this.playerMesh);
+
+                const light = new THREE.PointLight(0xfff7ed, 1.5, 10);
+                light.position.y = 2.5;
+                this.playerMesh.add(light);
+
+                const modelUrl = 'assets/peth/Models/GLB/' + petConfig.file;
+                
+                this.gltfLoader.load(modelUrl, (gltf) => {
+                    const model = gltf.scene;
+                    
+                    model.scale.set(1.5, 1.5, 1.5);
+                    model.position.set(0, 0, 0);
+                    // Rotasi 180 derajat (Math.PI) agar model asli menghadap depan menjauhi kamera
+                    model.rotation.y = Math.PI; 
+
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if(this.petTexture) {
+                                child.material = new THREE.MeshStandardMaterial({
+                                    map: this.petTexture,
+                                    roughness: 0.4,
+                                    metalness: 0.1
+                                });
+                            }
+                        }
+                    });
+
+                    this.playerMesh.add(model);
+                }, undefined, (error) => {
+                    console.warn("Menggunakan pet cadangan visual imut:", error);
+                    const fallbackGeo = new THREE.SphereGeometry(0.65, 16, 16);
+                    const fallbackMat = new THREE.MeshStandardMaterial({ color: petConfig.price === 0 ? 0xff7043 : 0x3b82f6, roughness: 0.2 });
+                    const fallback = new THREE.Mesh(fallbackGeo, fallbackMat);
+                    fallback.position.y = 0.65;
+                    fallback.castShadow = true;
+                    
+                    // Indikator mata depan lurus mengarah ke sumbu depan lokal (-Z)
+                    const eyeGeo = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+                    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+                    eyeL.position.set(0.2, 0.8, -0.55);
+                    const eyeR = eyeL.clone();
+                    eyeR.position.x = -0.2;
+                    
+                    this.playerMesh.add(fallback);
+                    this.playerMesh.add(eyeL);
+                    this.playerMesh.add(eyeR);
+                });
+
+                // Nilai dinamis ditarik dari pengaturan kamera
+                const targetDist = GAME_SETTINGS.cameraDistance; 
+                const targetHeight = GAME_SETTINGS.cameraHeight; 
+                
+                this.camera.fov = GAME_SETTINGS.cameraFOV;
+                this.camera.updateProjectionMatrix();
+
+                this.camera.position.set(
+                    this.playerMesh.position.x,
+                    this.playerMesh.position.y + targetHeight,
+                    this.playerMesh.position.z + targetDist
+                );
+                this.camera.lookAt(this.playerMesh.position);
+            }
+
+            loadShopPreviewModel(petId) {
+                const petConfig = PET_DATABASE.find(p => p.id === petId);
+                if(!petConfig) return;
+
+                while(this.previewGroup.children.length > 0) {
+                    this.previewGroup.remove(this.previewGroup.children[0]);
+                }
+
+                const loaderElement = document.getElementById('preview-loader');
+                if(loaderElement) loaderElement.classList.remove('hidden');
+
+                const modelUrl = 'assets/peth/Models/GLB/' + petConfig.file;
+                
+                this.gltfLoader.load(modelUrl, (gltf) => {
+                    if(loaderElement) loaderElement.classList.add('hidden');
+                    const model = gltf.scene;
+					model.scale.set(1.1, 1.1, 1.1);
+					model.position.set(0, -0.6, 0);
+                    model.rotation.y = -Math.PI / 4;
+
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if(this.petTexture) {
+                                child.material = new THREE.MeshStandardMaterial({
+                                    map: this.petTexture,
+                                    roughness: 0.4,
+                                    metalness: 0.1
+                                });
+                            }
+                        }
+                    });
+
+                    this.previewGroup.add(model);
+                }, undefined, (error) => {
+                    if(loaderElement) loaderElement.classList.add('hidden');
+                    const fallbackGeo = new THREE.SphereGeometry(0.75, 16, 16);
+                    const fallbackMat = new THREE.MeshStandardMaterial({ color: petConfig.price === 0 ? 0xff7043 : 0x3b82f6, roughness: 0.2 });
+                    const fallback = new THREE.Mesh(fallbackGeo, fallbackMat);
+                    fallback.position.y = 0.65;
+                    this.previewGroup.add(fallback);
+                });
+            }
+
+            clearScene() {
+                if(this.wallMeshes) this.wallMeshes.forEach(w => this.scene.remove(w));
+                if(this.gemsGroup) this.gemsGroup.forEach(g => this.scene.remove(g));
+                if(this.exitMesh) this.scene.remove(this.exitMesh);
+                if(this.playerMesh) this.scene.remove(this.playerMesh);
+                this.playerMesh = null;
+                this.gemsGroup = [];
+                this.particles.forEach(p => this.scene.remove(p));
+                this.particles = [];
+                this.dungeonDust.forEach(d => this.scene.remove(d));
+                this.dungeonDust = [];
+                this.exitRings.forEach(r => this.scene.remove(r));
+                this.exitRings = [];
+            }
+
+            updateHUD() {
+                const petConfig = PET_DATABASE.find(p => p.id === this.saveSystem.data.selectedPet) || PET_DATABASE[0];
+                document.getElementById('hud-pet-name').innerText = petConfig.name;
+                document.getElementById('hud-gems').innerText = this.currentGemsCollected;
+                
+                // Live Score calculation in HUD
+                let score = (this.currentGemsCollected * 150) + Math.max(0, 5000 - (this.elapsedTime * 15));
+                document.getElementById('hud-score').innerText = score;
+                document.getElementById('hud-money').innerText = this.saveSystem.data.money.toFixed(2);
+                
+                let m = Math.floor(this.elapsedTime / 60).toString().padStart(2, '0');
+                let s = (this.elapsedTime % 60).toString().padStart(2, '0');
+                document.getElementById('hud-timer').innerText = `${m}:${s}`;
+            }
+
+            giveUp() {
+                this.audio.playError();
+                this.endSession(false);
+            }
+
+            endSession(isWin = false) {
+                this.isPlaying = false;
+                clearInterval(this.timerInterval);
+
+                if(isWin) {
+                    this.audio.playWin();
+                    let earning = (this.currentGemsCollected * 0.05) + GAME_SETTINGS.victoryBonus;
+					this.saveSystem.data.money += earning;
+					this.saveSystem.data.totalGems += this.currentGemsCollected;
+                    
+                    // Formula Skor Speedrun Kompetitif
+                    let finalScore = (this.currentGemsCollected * 150) + Math.max(0, 5000 - (this.elapsedTime * 15));
+                    if(finalScore < 0) finalScore = 0;
+                    if(finalScore > this.saveSystem.data.highScore) {
+                        this.saveSystem.data.highScore = finalScore;
+                    }
+
+                    this.saveSystem.data.levelDifficulty += 1;
+                    this.saveSystem.save();
+
+                    ModalSystem.show(
+                        "Level Selesai!", 
+                        `Kamu Berhasil Kabur!\n\nSkor: ${finalScore}\nUang terkumpul: +${earning.toFixed(2)}\nWaktu Tempuh: ${this.elapsedTime} Detik.`,
+                        () => { this.goToMenu(); }
+                    );
+                } else {
+                    let earning = this.currentGemsCollected * 0.05;
+                    this.saveSystem.data.money += earning;
+                    this.saveSystem.save();
+
+                    ModalSystem.show(
+                        "Tantangan Selesai", 
+                        `Kamu memutuskan keluar dari dungeon.\n\nUang terkumpul: +${earning.toFixed(2)}\nGems didapat: ${this.currentGemsCollected}`,
+                        () => { this.goToMenu(); }
+                    );
+                }
+            }
+
+            goToMenu() {
+                document.getElementById('hud').classList.add('hidden');
+                document.getElementById('minimap-container').style.display = 'none';
+                document.getElementById('menu-screen').classList.remove('hidden');
+            }
+
+            renderShop() {
+                document.getElementById('shop-money-display').innerText = this.saveSystem.data.money.toFixed(2);
+                const container = document.getElementById('shop-items-list');
+                container.innerHTML = '';
+
+                PET_DATABASE.forEach(pet => {
+                    const isUnlocked = this.saveSystem.data.unlockedPets.includes(pet.id);
+                    const isSelectedInView = this.selectedPreviewPetId === pet.id;
+                    
+                    let unlockedBadge = isUnlocked 
+                        ? `<span class="text-emerald-500 font-bold text-sm flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Dimiliki</span>` 
+                        : `<span class="text-slate-600 font-extrabold text-sm flex items-center gap-1">
+						<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 128 128">
+							<path d="M0 0h128v128H0z" fill="none" />
+							<path fill="#FFCA28" d="M93.46 39.45c6.71-1.49 15.45-8.15 16.78-11.43c.78-1.92-3.11-4.92-4.15-6.13c-2.38-2.76-1.42-4.12-.5-7.41c1.05-3.74-1.44-7.87-4.97-9.49s-7.75-1.11-11.3.47s-6.58 4.12-9.55 6.62c-2.17-1.37-5.63-7.42-11.23-3.49c-3.87 2.71-4.22 8.61-3.72 13.32c1.17 10.87 3.85 16.51 8.9 18.03c6.38 1.92 13.44.91 19.74-.49" />
+							<path fill="#E2A610" d="M104.36 8.18c-.85 14.65-15.14 24.37-21.92 28.65l4.4 3.78s2.79.06 6.61-1.16c6.55-2.08 16.12-7.96 16.78-11.43c.97-5.05-4.21-3.95-5.38-7.94c-.61-2.11 2.97-6.1-.49-11.9m-24.58 3.91s-2.55-2.61-4.44-3.8c-.94 1.77-1.61 3.69-1.94 5.67c-.59 3.48 0 8.42 1.39 12.1c.22.57 1.04.48 1.13-.12c1.2-7.91 3.86-13.85 3.86-13.85" />
+							<path fill="#FFCA28" d="M61.96 38.16S30.77 41.53 16.7 68.61s-2.11 43.5 10.55 49.48s44.56 8.09 65.31 3.17s25.94-15.12 24.97-24.97c-1.41-14.38-14.77-23.22-14.77-23.22s.53-17.76-13.25-29.29c-12.23-10.24-27.55-5.62-27.55-5.62" />
+							<path fill="#6B4B46" d="M74.76 83.73c-6.69-8.44-14.59-9.57-17.12-12.6c-1.38-1.65-2.19-3.32-1.88-5.39c.33-2.2 2.88-3.72 4.86-4.09c2.31-.44 7.82-.21 12.45 4.2c1.1 1.04.7 2.66.67 4.11c-.08 3.11 4.37 6.13 7.97 3.53c3.61-2.61.84-8.42-1.49-11.24c-1.76-2.13-8.14-6.82-16.07-7.56c-2.23-.21-11.2-1.54-16.38 8.31c-1.49 2.83-2.04 9.67 5.76 15.45c1.63 1.21 10.09 5.51 12.44 8.3c4.07 4.83 1.28 9.08-1.9 9.64c-8.67 1.52-13.58-3.17-14.49-5.74c-.65-1.83.03-3.81-.81-5.53c-.86-1.77-2.62-2.47-4.48-1.88c-6.1 1.94-4.16 8.61-1.46 12.28c2.89 3.93 6.44 6.3 10.43 7.6c14.89 4.85 22.05-2.81 23.3-8.42c.92-4.11.82-7.67-1.8-10.97" />
+							<path fill="none" stroke="#6B4B46" stroke-miterlimit="10" stroke-width="5" d="M71.16 48.99c-12.67 27.06-14.85 61.23-14.85 61.23" />
+							<path fill="#6D4C41" d="M81.67 31.96c8.44 2.75 10.31 10.38 9.7 12.46c-.73 2.44-10.08-7.06-23.98-6.49c-4.86.2-3.45-2.78-1.2-4.5c2.97-2.27 7.96-3.91 15.48-1.47" />
+							<path fill="#6B4B46" d="M81.67 31.96c8.44 2.75 10.31 10.38 9.7 12.46c-.73 2.44-10.08-7.06-23.98-6.49c-4.86.2-3.45-2.78-1.2-4.5c2.97-2.27 7.96-3.91 15.48-1.47" />
+							<path fill="#E2A610" d="M96.49 58.86c1.06-.73 4.62.53 5.62 7.5c.49 3.41.64 6.71.64 6.71s-4.2-3.77-5.59-6.42c-1.75-3.35-2.43-6.59-.67-7.79" />
+						</svg>
+						${pet.price}</span>`;
+
+                    let selectedClass = isSelectedInView ? 'border-orange-500 bg-orange-50/50 shadow-md ring-1 ring-orange-400' : 'border-slate-200 bg-slate-50 hover:bg-slate-100/80';
+
+                    let itemHtml = `
+                        <div class="flex flex-col justify-between p-4 border-2 rounded-2xl cursor-pointer transition-all h-32 ${selectedClass}" onclick="game.selectShopItem('${pet.id}')">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-white p-1 rounded-xl border border-slate-100 shadow-sm shrink-0">
+                                    ${pet.svg}
+                                </div>
+                                <div class="flex flex-col gap-0.5">
+                                    <div class="font-extrabold text-slate-900 text-base leading-tight">${pet.name}</div>
+                                    <div class="text-xs font-bold ${pet.color}">${pet.rarity}</div>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center mt-2 pt-2 border-t border-slate-100">
+                                <span class="text-xs font-semibold text-slate-500">Kecepatan: <span class="text-slate-800 font-bold">${pet.speed}</span></span>
+                                ${unlockedBadge}
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += itemHtml;
+                });
+
+                this.updatePreviewPanel();
+            }
+
+            selectShopItem(petId) {
+                this.audio.playClick();
+                this.selectedPreviewPetId = petId;
+                this.loadShopPreviewModel(petId);
+                this.renderShop();
+            }
+
+            updatePreviewPanel() {
+                const pet = PET_DATABASE.find(p => p.id === this.selectedPreviewPetId);
+                if(!pet) return;
+
+                document.getElementById('prev-name').innerText = pet.name;
+                const rarityLabel = document.getElementById('prev-rarity');
+                rarityLabel.innerText = pet.rarity;
+                
+                // Menghapus kelas warna Tailwind yang lama
+                rarityLabel.className = "text-xs font-bold uppercase tracking-wider mb-3 " + pet.color;
+
+                document.getElementById('prev-speed').innerText = pet.speed;
+                document.getElementById('prev-tier').innerText = pet.price === 0 ? "Starter" : pet.price < 500 ? "Pro" : "Elite";
+
+                const actionContainer = document.getElementById('shop-action-container');
+                actionContainer.innerHTML = '';
+
+                const isUnlocked = this.saveSystem.data.unlockedPets.includes(pet.id);
+                const isActive = this.saveSystem.data.selectedPet === pet.id;
+
+                if(isActive) {
+                    actionContainer.innerHTML = `<button class="w-full py-2.5 text-sm font-bold bg-slate-400 text-white rounded-full cursor-not-allowed" disabled><i class="fa-solid fa-check-double mr-1"></i> Sedang Digunakan</button>`;
+                } else if(isUnlocked) {
+                    actionContainer.innerHTML = `<button class="w-full py-2.5 text-sm font-bold bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-full hover:shadow-lg hover:shadow-orange-500/20 active:scale-95 transition-all shadow-md" onclick="game.useSelectedPet('${pet.id}')"><i class="fa-solid fa-paw mr-1"></i> Pilih Gunakan</button>`;
+                } else {
+                    actionContainer.innerHTML = `<button class="w-full py-2.5 text-sm font-bold bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-full hover:shadow-lg hover:shadow-emerald-500/20 active:scale-95 transition-all shadow-md" onclick="game.buySelectedPet('${pet.id}', ${pet.price})"><i class="fa-solid fa-cart-shopping mr-1"></i> Beli $${pet.price}</button>`;
+                }
+            }
+
+            useSelectedPet(petId) {
+                this.audio.playClick();
+                this.saveSystem.data.selectedPet = petId;
+                this.saveSystem.save();
+                this.renderShop();
+            }
+
+            buySelectedPet(petId, price) {
+                if(this.saveSystem.data.money >= price) {
+                    this.saveSystem.data.money -= price;
+                    this.saveSystem.data.unlockedPets.push(petId);
+                    this.saveSystem.data.selectedPet = petId;
+                    this.saveSystem.save();
+                    this.audio.playBuy();
+                    this.renderShop();
+                } else {
+                    this.audio.playError();
+                    ModalSystem.show("Transaksi Gagal", "Uang kamu tidak mencukupi untuk mengadopsi hewan peliharaan ini!");
+                }
+            }
+
+            openShop() { 
+                this.audio.playClick(); 
+                document.getElementById('shop-screen').classList.remove('hidden'); 
+                // Otomatis arahkan pratinjau 3D ke pet yang sedang aktif digunakan saat toko baru dibuka
+                this.selectedPreviewPetId = this.saveSystem.data.selectedPet;
+                this.loadShopPreviewModel(this.selectedPreviewPetId);
+                this.renderShop();
+            }
+            
+            closeShop() { 
+                this.audio.playClick(); 
+                document.getElementById('shop-screen').classList.add('hidden'); 
+            }
+
+            resetProgress() {
+                ModalSystem.show(
+                    "Atur Ulang Kemajuan?", 
+                    "Apakah Anda yakin ingin menghapus seluruh data petualangan, koleksi pet, dan koin Anda?",
+                    (isConfirmed) => {
+                        if (isConfirmed) {
+                            this.saveSystem.reset();
+                            this.renderShop();
+                            ModalSystem.show("Selesai", "Seluruh progress data telah dibersihkan.");
+                        }
+                    }, 
+                    true
+                );
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // 1. Live Preview di Toko
+                if(!document.getElementById('shop-screen').classList.contains('hidden')) {
+                    this.previewGroup.rotation.y += 0.015;
+                    this.shopRenderer.render(this.shopScene, this.shopCamera);
+                }
+
+                // 2. Render Dunia Utama Game
+                if(this.isPlaying && this.playerMesh) {
+                    const petConfig = PET_DATABASE.find(p => p.id === this.saveSystem.data.selectedPet) || PET_DATABASE[0];
+                    const dt = 0.016; 
+                    
+                    let moveVec = this.input.vector;
+                    
+                    // Sistem Belok Kemudi (Steering Controls)
+                    if(moveVec.x !== 0) {
+                        // Belok Kiri/Belok Kanan memutar hadap pet
+                        const turnSpeed = 2.8; 
+                        this.playerMesh.rotation.y -= moveVec.x * turnSpeed * dt;
+                    }
+
+                    if(moveVec.y !== 0) {
+                        // Vektor "depan" mengarah lurus ke depan lokal (-Z)
+                        let localForward = new THREE.Vector3(0, 0, -1);
+                        localForward.applyQuaternion(this.playerMesh.quaternion);
+
+                        let speed = petConfig.speed;
+                        // Tombol W/Up membuat moveVec.y < 0 (-1), sehingga directionSign bernilai positif (Maju)
+                        let directionSign = -moveVec.y; 
+                        
+                        let nextX = this.playerMesh.position.x + localForward.x * speed * dt * directionSign;
+                        let nextZ = this.playerMesh.position.z + localForward.z * speed * dt * directionSign;
+                        
+                        // Tabrakan dinding sumbu independen dengan deteksi Bounding Circle agar anti slip / tembus dinding
+                        if (!this.checkWallCollision(nextX, this.playerMesh.position.z)) {
+                            this.playerMesh.position.x = nextX;
+                        }
+                        if (!this.checkWallCollision(this.playerMesh.position.x, nextZ)) {
+                            this.playerMesh.position.z = nextZ;
+                        }
+
+                        // Efek melompat/goyangan berjalan
+                        this.playerMesh.position.y = Math.abs(Math.sin(Date.now() * 0.012)) * 0.2;
+                    } else {
+                        this.playerMesh.position.y = 0;
+                    }
+
+                    // Nilai target ditarik secara dinamis dari GAME_SETTINGS agar bisa digeser lewat slider UI
+                    const targetDist = GAME_SETTINGS.cameraDistance;   
+                    const targetHeight = GAME_SETTINGS.cameraHeight; 
+
+                    // Hitung target posisi kamera persis di belakang punggung pet
+                    let localBackward = new THREE.Vector3(0, 0, 1);
+                    localBackward.applyQuaternion(this.playerMesh.quaternion);
+
+                    const targetCamX = this.playerMesh.position.x + localBackward.x * targetDist;
+                    const targetCamZ = this.playerMesh.position.z + localBackward.z * targetDist;
+                    const targetCamY = this.playerMesh.position.y + targetHeight;
+
+                    // Interpolasi lembut (Lerp) kamera berayun sinematis tanpa patah-patah
+                    const lerpFactor = 0.08; 
+                    this.camera.position.x += (targetCamX - this.camera.position.x) * lerpFactor;
+                    this.camera.position.z += (targetCamZ - this.camera.position.z) * lerpFactor;
+                    this.camera.position.y += (targetCamY - this.camera.position.y) * lerpFactor;
+
+                    // Sorotan pandangan mengunci pada tubuh pet
+                    this.camera.lookAt(this.playerMesh.position);
+
+                    // Lampu dinamis matahari mengikuti pergerakan player
+                    this.dirLight.position.set(this.playerMesh.position.x + 15, 25, this.playerMesh.position.z + 15);
+                    this.dirLight.target = this.playerMesh;
+
+                    // Rotasi & Tabrakan Gem Collectible
+                    for(let i = this.gemsGroup.length - 1; i >= 0; i--) {
+                        let gem = this.gemsGroup[i];
+                        
+                        // Efek mengambang naik turun (Floating Sine wave)
+                        const offset = gem.userData.pulseOffset;
+                        gem.position.y = gem.userData.baseY + Math.sin(Date.now() * 0.003 + offset) * 0.15;
+                        gem.rotation.y += 0.04;
+                        gem.rotation.z += 0.02;
+
+                        let dist = this.playerMesh.position.distanceTo(gem.position);
+                        if(dist < 1.3) {
+                            this.audio.playCollect();
+                            this.currentGemsCollected += gem.userData.value;
+                            this.spawnBurstParticle(gem.position, gem.material.color);
+                            this.scene.remove(gem);
+                            this.gemsGroup.splice(i, 1);
+                            this.updateHUD();
+                        }
+                    }
+
+                    // Update Burst Particles
+                    this.updateParticles(dt);
+
+                    // Update Dungeon Dust Particles
+                    for(let dust of this.dungeonDust) {
+                        dust.position.y += dust.userData.speedY * dt;
+                        dust.rotation.y += dust.userData.rotSpeed;
+                        dust.rotation.x += dust.userData.rotSpeed;
+                        if(dust.position.y > 4.5) {
+                            dust.position.y = 0;
+                            dust.position.x = Math.random() * this.mazeWidth * this.blockSize;
+                            dust.position.z = Math.random() * this.mazeHeight * this.blockSize;
+                        }
+                    }
+
+                    // Animasi Cincin Portal Finish
+                    this.exitRings.forEach((ring, idx) => {
+                        ring.rotation.z += 0.015 * (idx === 0 ? 1 : -1);
+                        ring.scale.setScalar(1 + Math.sin(Date.now() * 0.005 + idx * Math.PI) * 0.08);
+                    });
+
+                    // Deteksi Portal Finish Keluar Level
+                    if(this.exitMesh) {
+                        let distToExit = this.playerMesh.position.distanceTo(this.exitMesh.position);
+                        if(distToExit < 1.3) {
+                            this.endSession(true);
+                        }
+                    }
+
+                    // Hanya panggil penggambaran minimap jika disetujui konfigurasi & sudah tidak terkunci
+                    if(GAME_SETTINGS.enableMinimap && this.miniMapUnlocked) {
+                        this.drawMiniMap();
+                    }
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            // Deteksi tabrakan presisi menggunakan sampling melingkar (Bounding Circle) di sekeliling Pet
+            checkWallCollision(px, pz) {
+                const radius = 0.65; // Radius fisik dari badan Pet
+                const angles = [0, Math.PI/4, Math.PI/2, 3*Math.PI/4, Math.PI, 5*Math.PI/4, 3*Math.PI/2, 7*Math.PI/4];
+                
+                for(let angle of angles) {
+                    let cx = px + Math.cos(angle) * radius;
+                    let cz = pz + Math.sin(angle) * radius;
+                    
+                    let gridX = Math.round(cx / this.blockSize);
+                    let gridY = Math.round(cz / this.blockSize);
+
+                    if(gridX < 0 || gridX >= this.mazeWidth || gridY < 0 || gridY >= this.mazeHeight) return true;
+                    if(this.mazeData[gridY][gridX] === 1) return true;
+                }
+                return false;
+            }
+
+            spawnBurstParticle(pos, color) {
+                for(let i=0; i<12; i++) {
+                    let pGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+                    let pMat = new THREE.MeshBasicMaterial({ color: color });
+                    let p = new THREE.Mesh(pGeo, pMat);
+                    p.position.copy(pos);
+                    
+                    p.userData = {
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: Math.random() * 5 + 3,
+                        vz: (Math.random() - 0.5) * 6,
+                        life: 0.45
+                    };
+                    this.scene.add(p);
+                    this.particles.push(p);
+                }
+            }
+
+            updateParticles(dt) {
+                for(let i = this.particles.length - 1; i >= 0; i--) {
+                    let p = this.particles[i];
+                    p.position.x += p.userData.vx * dt;
+                    p.position.y += p.userData.vy * dt;
+                    p.position.z += p.userData.vz * dt;
+                    p.userData.vy -= 9.8 * dt;
+                    p.userData.life -= dt;
+
+                    if(p.userData.life <= 0) {
+                        this.scene.remove(p);
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+
+            drawMiniMap() {
+                const canvas = document.getElementById('minimap-canvas');
+                const ctx = canvas.getContext('2d');
+                if(!canvas || !ctx) return;
+
+                if(canvas.width !== canvas.clientWidth) {
+                    canvas.width = canvas.clientWidth;
+                    canvas.height = canvas.clientHeight;
+                }
+
+                ctx.clearRect(0,0, canvas.width, canvas.height);
+
+                let cw = canvas.width / this.mazeWidth;
+                let ch = canvas.height / this.mazeHeight;
+
+                for(let y=0; y<this.mazeHeight; y++) {
+                    for(let x=0; x<this.mazeWidth; x++) {
+                        if(this.mazeData[y][x] === 1) {
+                            ctx.fillStyle = "#cbd5e1"; // Tembok abu-abu mutiara terang
+                            ctx.fillRect(x*cw, y*ch, cw - 0.5, ch - 0.5);
+                        }
+                    }
+                }
+
+                // Portal Keluar (Emas Lingkaran)
+                ctx.fillStyle = "#f59e0b";
+                ctx.beginPath();
+                ctx.arc((this.mazeWidth-2)*cw + cw/2, (this.mazeHeight-2)*ch + ch/2, cw/2.5, 0, Math.PI*2);
+                ctx.fill();
+
+                // Player Dot (Biru bersinar terang)
+                if(this.playerMesh) {
+                    let px = Math.round(this.playerMesh.position.x / this.blockSize);
+                    let py = Math.round(this.playerMesh.position.z / this.blockSize);
+                    ctx.fillStyle = "#3b82f6";
+                    ctx.beginPath();
+                    ctx.arc(px*cw + cw/2, py*ch + ch/2, cw/3, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        let game;
+        window.addEventListener('DOMContentLoaded', () => {
+            game = new PetDungeonGame();
+        });
+    </script>
+</body>
+</html>
